@@ -4,7 +4,7 @@
 //#include "Adafruit_BLE.h"
 #include "Adafruit_BluefruitLE_GATT.h"
 
-#define CONTROL_CYCLE_DURATION         5000L // [ms]
+#define CONTROL_CYCLE_DURATION         6000L // [ms]
 
 #define BUFSIZE                        128   // Size of the read buffer for incoming data
 #define BLE_VERBOSE_MODE               true  // If set to 'true' enables debug output
@@ -27,11 +27,11 @@
 Adafruit_BluefruitLE_GATT ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
 /* The service information */
-int8_t controllerServiceId;
-int8_t waterTempMeasureCharId;
-int8_t ambientTempMeasureCharId;
-int8_t targetTempCharId;
-int8_t tankCapacityCharId;
+int16_t controllerServiceId;
+int16_t waterTempMeasureCharId;
+int16_t ambientTempMeasureCharId;
+int16_t targetTempCharId;
+int16_t tankCapacityCharId;
 
 
 void setup(void) {
@@ -44,14 +44,10 @@ void setup(void) {
   randomSeed(micros());
 
 
-  if ( !ble.begin(BLE_VERBOSE_MODE))  {
-    ble.error(F("Couldn't find Bluefruit, make sure it's in CoMmanD mode & check wiring?"));
-  }
+  ble.assertOK(ble.begin(BLE_VERBOSE_MODE), F("Couldn't find Bluefruit, make sure it's in CoMmanD mode & check wiring?"));
 
   /* Perform a factory reset to make sure everything is in a known state */
-  if (! ble.factoryReset()) {
-     ble.error(F("Couldn't factory reset"));
-  }
+  ble.assertOK(ble.factoryReset(), F("Could not factory reset"));
 
   /* Disable command echo from Bluefruit */
   ble.echo(false);
@@ -71,7 +67,7 @@ void setup(void) {
   tankCapacityCharId =       ble.addGattCharacteristic(0x0004, CHAR_PROP_READ | CHAR_PROP_WRITE, 4, 4);
 
   /* Add the Heart Rate Service to the advertising data (needed for Nordic apps to detect the service) */
-  ble.sendCommandCheckOK( F("AT+GAPSETADVDATA=02-01-06-05-02-0d-18-0a-18") );
+  ble.assertOK(ble.sendCommandCheckOK( F("AT+GAPSETADVDATA=02-01-06-05-02-0d-18-0a-18")), F("Could not set advertising data"));
 
   /* Reset the device for the new service setting changes to take effect */
   ble.reset();
@@ -90,14 +86,13 @@ void loop(void) {
   }
 
   if (elapsed == 0L) {
-    byte bytes[sizeof(int)];
+    byte bytes[4];
     
     int waterTemp = random(20, 42); 
     memcpy(bytes, &waterTemp, sizeof(int));
     reverseBytes(bytes, sizeof(int));
-  //Serial.print("**waterTempMeasureCharId="); Serial.println(waterTempMeasureCharId);
     ble.setGattCharacteristicValue(waterTempMeasureCharId, bytes, sizeof(int));
-    
+  
     long ambientTemp = random(13, 28);
     memcpy(bytes, &ambientTemp, sizeof(long));
     reverseBytes(bytes, sizeof(long));
@@ -109,33 +104,34 @@ void loop(void) {
     Serial.println(ambientTemp, HEX);
   }
 
-  static long previousTargetTemp = 0;
-  byte rawValue[4];
-  ble.getGattCharacteristicValue(targetTempCharId, rawValue, sizeof(rawValue));
-  reverseBytes(rawValue, sizeof(rawValue));
-  long targetTemp;  
-  memcpy(&targetTemp, rawValue, sizeof(rawValue));
-  if(targetTemp != previousTargetTemp) {
-    previousTargetTemp = targetTemp;
-    Serial.print(F("** New target temp = 0x"));
-    Serial.println(targetTemp, HEX);
+  {
+    byte bytes[4];
+    
+    static long previousTargetTemp = 0;
+    ble.getGattCharacteristicValue(targetTempCharId, bytes, sizeof(long));
+    reverseBytes(bytes, sizeof(long));
+    long targetTemp;  
+    memcpy(&targetTemp, bytes, sizeof(long));
+    if(targetTemp != previousTargetTemp) {
+      previousTargetTemp = targetTemp;
+      Serial.print(F("** New target temp = 0x"));
+      Serial.println(targetTemp, HEX);
+    }
+    
+    static float previousTankCapacity = 0.0;
+    ble.getGattCharacteristicValue(tankCapacityCharId, bytes, sizeof(float));
+    // don't reverse bytes!
+    float tankCapacity;  
+    memcpy(&tankCapacity, bytes, sizeof(float));
+    if(tankCapacity != previousTankCapacity) {
+      previousTankCapacity = tankCapacity;
+      Serial.print(F("** New tank capacity = "));
+      Serial.println(tankCapacity);
+    }
   }
-
-  static float previousTankCapacity = 0.0;
-  //byte rawValue[4];
-  ble.getGattCharacteristicValue(tankCapacityCharId, rawValue, sizeof(rawValue));
-  reverseBytes(rawValue, sizeof(rawValue));
-  float tankCapacity;  
-  memcpy(&tankCapacity, rawValue, sizeof(rawValue));
-  if(tankCapacity != previousTankCapacity) {
-    previousTankCapacity = tankCapacity;
-    Serial.print(F("** New tank capacity = "));
-    Serial.println(tankCapacity);
-  }
-
 
   /* Delay before next measurement update */
-  delay(1000);
+  delay(2000);
 }
 
 void reverseBytes(byte *buf, uint16_t len) {

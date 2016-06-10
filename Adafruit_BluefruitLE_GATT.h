@@ -18,22 +18,22 @@
   class Adafruit_BluefruitLE_GATT : public Adafruit_BluefruitLE_SPI {
 
     public:
-      void error(const __FlashStringHelper*err);
+      void assertOK(boolean condition, const __FlashStringHelper*err);
       
       Adafruit_BluefruitLE_GATT(int8_t csPin, int8_t irqPin, int8_t rstPin = -1) : Adafruit_BluefruitLE_SPI(csPin, irqPin, rstPin) { };
 
       void setGattDeviceName(const char *name);
       
-      int8_t addGattService(const char *uuid128);
+      int16_t addGattService(const char *uuid128);
       
-      int8_t addGattCharacteristic(uint16_t uuid16, CharacteristicProperties props, byte minLen, byte maxLen);
+      int16_t addGattCharacteristic(uint16_t uuid16, CharacteristicProperties props, byte minLen, byte maxLen);
       
-      void setGattCharacteristicValue(const int8_t id, byte *value, uint16_t len);
+      void setGattCharacteristicValue(int16_t id, byte *value, uint16_t len);
 
       /*
        * Returns the number of bytes in reply; bytes exceeding maxLen will be read but will not be returned.as reply.
        */
-      uint16_t getGattCharacteristicValue(const int8_t id, byte *reply, uint16_t maxLen);
+      uint16_t getGattCharacteristicValue(int16_t id, byte *reply, uint16_t maxLen);
       
     protected:
     

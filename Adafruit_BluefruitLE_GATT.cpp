@@ -7,73 +7,63 @@ const char fmt_gattaddservice[] PROGMEM = "AT+GATTADDSERVICE=UUID128=%s";
 const char fmt_gattaddchar[]    PROGMEM = "AT+GATTADDCHAR=UUID=%#4X,PROPERTIES=%#2X,MIN_LEN=%i,MAX_LEN=%i,VALUE=0";
 const char fmt_gattsetchar[]    PROGMEM = "AT+GATTCHAR=%i,%s";
 const char fmt_gattgetchar[]    PROGMEM = "AT+GATTCHAR=%i";
+const char fmt_bintohex[]       PROGMEM = "%02X-";
 
-void Adafruit_BluefruitLE_GATT::error(const __FlashStringHelper*err) {
-  Serial.print("### ");
-  Serial.println(err);
-  while (1);
+void Adafruit_BluefruitLE_GATT::assertOK(boolean condition, const __FlashStringHelper*err) {
+  if (! condition) {
+    Serial.print("### ");
+    Serial.println(err);
+    Serial.flush();
+    while(1);
+  }
 }
 
 void Adafruit_BluefruitLE_GATT::setGattDeviceName(const char *name) {
   char cmd[strlen_P(fmt_gapdevname) - 2 + strlen(name) + 1];
   sprintf_P(cmd, fmt_gapdevname, name);
-  if (! sendCommandCheckOK(cmd) ) {
-    error(F("Could not set device name?"));
-  }
+  assertOK(sendCommandCheckOK(cmd), F("Could not set device name?"));
 }
 
-int8_t Adafruit_BluefruitLE_GATT::addGattService(const char *uuid128) {
+int16_t Adafruit_BluefruitLE_GATT::addGattService(const char *uuid128) {
   char cmd[strlen_P(fmt_gattaddservice) - 2 + strlen(uuid128) + 1];
   sprintf_P(cmd, fmt_gattaddservice, uuid128);
   int32_t pos;
-  if (! sendCommandWithIntReply(cmd, &pos)) {
-    error(F("Could not add service"));
-  }
-  return (int8_t) pos;
+  assertOK(sendCommandWithIntReply(cmd, &pos), F("Could not add service"));
+  return (int16_t) pos;
 }
 
-int8_t Adafruit_BluefruitLE_GATT::addGattCharacteristic(uint16_t uuid16, CharacteristicProperties props, byte minLen, byte maxLen) {
+int16_t Adafruit_BluefruitLE_GATT::addGattCharacteristic(uint16_t uuid16, CharacteristicProperties props, byte minLen, byte maxLen) {
   char cmd[strlen_P(fmt_gattaddchar) + 2 + 1 + 1 + 1];
   sprintf_P(cmd, fmt_gattaddchar, uuid16, props, (uint16_t) minLen, (uint16_t) maxLen);
   int32_t pos;
-  if (! sendCommandWithIntReply(cmd, &pos)) {
-    error(F("Could not add characteristic"));
-  }
-  return (int8_t) pos;
+  assertOK(sendCommandWithIntReply(cmd, &pos), F("Could not add characteristic"));
+  return (int16_t) pos;
 }
 
-void Adafruit_BluefruitLE_GATT::setGattCharacteristicValue(const int8_t id, byte *value, uint16_t len) {
-  if (len == 0) {
-    error(F("Characteristic value length cannot be 0"));
-  }
-  // AT+GATTCHAR takes each byte in hex separated by a dash, e.g. 4 bytes: xx-xx-xx-xx
-  char str[len*3 - 1 + 1];
+void Adafruit_BluefruitLE_GATT::setGattCharacteristicValue(int16_t id, byte *value, uint16_t len) {
+  assertOK(id != 0, F("Characteristic id cannot be 0"));
+  assertOK(len != 0, F("Characteristic value length cannot be 0"));
+  
+  // AT+GATTCHAR takes each byte in hex separated by a dash, e.g. 4 bytes: xx-xx-xx-xx (= 11 characters)
+  char str[len*3];  // includes terminating '\0'
   for (uint16_t i=0; i<len; i++) {
-    sprintf(&str[i*3], "%02X-", value[i]);
+    sprintf_P(&str[i*3], fmt_bintohex, value[i]);
   }
   str[len*3 - 1] = '\0';
   
-  char cmd[__strlen_P(fmt_gattsetchar) + (len*3 - 1) + 1];
-  if (id == 0) { 
-    error(F("Characteristic id cannot be 0"));
-  }
-  // Serial.print("id=");Serial.println(id);
+  char cmd[strlen_P(fmt_gattsetchar) + strlen(str) + 1];
   sprintf_P(cmd, fmt_gattsetchar, id, str);
-  if (! sendCommandCheckOK(cmd)) {
-    error(F("Could not set characteristic value"));
-  }
+  assertOK(sendCommandCheckOK(cmd), F("Could not set characteristic value"));
 }
 
-uint16_t Adafruit_BluefruitLE_GATT::getGattCharacteristicValue(const int8_t id, byte *reply, uint16_t maxLen) {
+uint16_t Adafruit_BluefruitLE_GATT::getGattCharacteristicValue(int16_t id, byte *reply, uint16_t maxLen) {
   char cmd[strlen_P(fmt_gattgetchar) + 2 + 1];
   sprintf_P(cmd, fmt_gattgetchar, id);
   
-  // AT+GATTCHAR returns each byte in hex separated by a dash, e.g. 4 bytes: xx-xx-xx-xx
+  // AT+GATTCHAR returns each byte in hex separated by a dash, e.g. 4 bytes: xx-xx-xx-xx (= 11 characters)
   char replyStr[maxLen*3];  // includes terminating '\0'
   uint16_t strLen;
-  if (! sendCommandWithStringReply(cmd, replyStr, &strLen)) {
-    error(F("Could not get characteristic value"));
-  }
+  assertOK(sendCommandWithStringReply(cmd, replyStr, &strLen), F("Could not get characteristic value"));
   
   if (strLen == 0 || (strLen + 1) % 3 != 0) {
     return 0;
