@@ -15,6 +15,7 @@
   // bitwise OR combination ("|") of CharacteristicPropertyEnum(s):
   typedef unsigned short CharacteristicProperties;
   
+  
   class Adafruit_BluefruitLE_GATT : public Adafruit_BluefruitLE_SPI {
 
     public:
@@ -24,16 +25,22 @@
 
       void setGattDeviceName(const char *name);
       
-      int16_t addGattService(const char *uuid128);
+      int8_t addGattService(const char *uuid128);
       
-      int16_t addGattCharacteristic(uint16_t uuid16, CharacteristicProperties props, byte minLen, byte maxLen);
+      int8_t addGattCharacteristic(uint16_t uuid16, CharacteristicProperties props, byte minLen, byte maxLen);
       
-      void setGattCharacteristicValue(int16_t id, byte *value, uint16_t len);
+      void setGattCharacteristicValue(int8_t id, byte   *value, uint16_t len);
+      void setGattCharacteristicValue(int8_t id, int16_t value);
+      void setGattCharacteristicValue(int8_t id, int32_t value);
+      void setGattCharacteristicValue(int8_t id, float   value);
 
       /*
        * Returns the number of bytes in reply; bytes exceeding maxLen will be read but will not be returned.as reply.
        */
-      uint16_t getGattCharacteristicValue(int16_t id, byte *reply, uint16_t maxLen);
+      uint16_t getGattCharacteristicValue(int8_t id, byte *reply, uint16_t maxLen);
+      void getGattCharacteristicValue(int8_t id, int16_t *reply);
+      void getGattCharacteristicValue(int8_t id, int32_t *reply);
+      void getGattCharacteristicValue(int8_t id, float   *reply);
       
     protected:
     
@@ -42,5 +49,8 @@
        */
       bool sendCommandWithStringReply(const char cmd[], char *reply, uint16_t *len);
   };
+
+
+  void reverseBytes(byte *buf, uint16_t len);
 
 #endif

@@ -1,7 +1,4 @@
 #include <Arduino.h>
-#include <stdio.h>
-#include <SPI.h>
-//#include "Adafruit_BLE.h"
 #include "Adafruit_BluefruitLE_GATT.h"
 
 #define CONTROL_CYCLE_DURATION         6000L // [ms]
@@ -27,11 +24,11 @@
 Adafruit_BluefruitLE_GATT ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
 /* The service information */
-int16_t controllerServiceId;
-int16_t waterTempMeasureCharId;
-int16_t ambientTempMeasureCharId;
-int16_t targetTempCharId;
-int16_t tankCapacityCharId;
+int8_t controllerServiceId;
+int8_t waterTempMeasureCharId;
+int8_t ambientTempMeasureCharId;
+int8_t targetTempCharId;
+int8_t tankCapacityCharId;
 
 
 void setup(void) {
@@ -86,17 +83,12 @@ void loop(void) {
   }
 
   if (elapsed == 0L) {
-    byte bytes[4];
     
     int waterTemp = random(20, 42); 
-    memcpy(bytes, &waterTemp, sizeof(int));
-    reverseBytes(bytes, sizeof(int));
-    ble.setGattCharacteristicValue(waterTempMeasureCharId, bytes, sizeof(int));
+    ble.setGattCharacteristicValue(waterTempMeasureCharId, waterTemp);
   
     long ambientTemp = random(13, 28);
-    memcpy(bytes, &ambientTemp, sizeof(long));
-    reverseBytes(bytes, sizeof(long));
-    ble.setGattCharacteristicValue(ambientTempMeasureCharId, bytes, sizeof(long));
+    ble.setGattCharacteristicValue(ambientTempMeasureCharId, ambientTemp);
 
     Serial.print(F("New water temp = 0x"));
     Serial.print(waterTemp, HEX);
@@ -104,41 +96,25 @@ void loop(void) {
     Serial.println(ambientTemp, HEX);
   }
 
-  {
-    byte bytes[4];
-    
-    static long previousTargetTemp = 0;
-    ble.getGattCharacteristicValue(targetTempCharId, bytes, sizeof(long));
-    reverseBytes(bytes, sizeof(long));
-    long targetTemp;  
-    memcpy(&targetTemp, bytes, sizeof(long));
-    if(targetTemp != previousTargetTemp) {
-      previousTargetTemp = targetTemp;
-      Serial.print(F("** New target temp = 0x"));
-      Serial.println(targetTemp, HEX);
-    }
-    
-    static float previousTankCapacity = 0.0;
-    ble.getGattCharacteristicValue(tankCapacityCharId, bytes, sizeof(float));
-    // don't reverse bytes!
-    float tankCapacity;  
-    memcpy(&tankCapacity, bytes, sizeof(float));
-    if(tankCapacity != previousTankCapacity) {
-      previousTankCapacity = tankCapacity;
-      Serial.print(F("** New tank capacity = "));
-      Serial.println(tankCapacity);
-    }
+  static long previousTargetTemp = 0;
+  long targetTemp;  
+  ble.getGattCharacteristicValue(targetTempCharId, &targetTemp);
+  if(targetTemp != previousTargetTemp) {
+    previousTargetTemp = targetTemp;
+    Serial.print(F("** New target temp = 0x"));
+    Serial.println(targetTemp, HEX);
+  }
+  
+  static float previousTankCapacity = 0.0;
+  float tankCapacity;  
+  ble.getGattCharacteristicValue(tankCapacityCharId, &tankCapacity);
+  if(tankCapacity != previousTankCapacity) {
+    previousTankCapacity = tankCapacity;
+    Serial.print(F("** New tank capacity = "));
+    Serial.println(tankCapacity);
   }
 
   /* Delay before next measurement update */
   delay(2000);
-}
-
-void reverseBytes(byte *buf, uint16_t len) {
-  for(uint16_t i=0; i<len/2; i++) {
-    byte b = buf[i];
-    buf[i] = buf[len-1-i];
-    buf[len-1-i] = b;
-  }
 }
 

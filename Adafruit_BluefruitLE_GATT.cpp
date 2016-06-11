@@ -6,7 +6,7 @@
 
 const char fmt_gapdevname[]     PROGMEM = "AT+GAPDEVNAME=%s";
 const char fmt_gattaddservice[] PROGMEM = "AT+GATTADDSERVICE=UUID128=%s";
-const char fmt_gattaddchar[]    PROGMEM = "AT+GATTADDCHAR=UUID=%#4X,PROPERTIES=%#2X,MIN_LEN=%i,MAX_LEN=%i,VALUE=0";
+const char fmt_gattaddchar[]    PROGMEM = "AT+GATTADDCHAR=UUID=%#4X,PROPERTIES=%#2X,MIN_LEN=%i,MAX_LEN=%i,VALUE=%s";
 const char fmt_gattsetchar[]    PROGMEM = "AT+GATTCHAR=%i,%s";
 const char fmt_gattgetchar[]    PROGMEM = "AT+GATTCHAR=%i";
 const char fmt_bintohex[]       PROGMEM = "%02X-";
@@ -32,30 +32,40 @@ void Adafruit_BluefruitLE_GATT::assertOK(boolean condition, const __FlashStringH
 }
 
 void Adafruit_BluefruitLE_GATT::setGattDeviceName(const char *name) {
-  char cmd[strlen_P(fmt_gapdevname) - 2 + strlen(name) + 1];
+  char cmd[strlen_P(fmt_gapdevname) + strlen(name) + 1];
   sprintf_P(cmd, fmt_gapdevname, name);
   assertOK(sendCommandCheckOK(cmd), F("Could not set device name?"));
 }
 
-int16_t Adafruit_BluefruitLE_GATT::addGattService(const char *uuid128) {
-  char cmd[strlen_P(fmt_gattaddservice) - 2 + strlen(uuid128) + 1];
+
+int8_t Adafruit_BluefruitLE_GATT::addGattService(const char *uuid128) {
+  char cmd[strlen_P(fmt_gattaddservice) + strlen(uuid128) + 1];
   sprintf_P(cmd, fmt_gattaddservice, uuid128);
   int32_t pos;
   assertOK(sendCommandWithIntReply(cmd, &pos), F("Could not add service"));
-  return (int16_t) pos;
+  return (int8_t) pos;
 }
 
-int16_t Adafruit_BluefruitLE_GATT::addGattCharacteristic(uint16_t uuid16, CharacteristicProperties props, byte minLen, byte maxLen) {
-  char cmd[strlen_P(fmt_gattaddchar) + 2 + 1 + 1 + 1];
-  sprintf_P(cmd, fmt_gattaddchar, uuid16, props, (uint16_t) minLen, (uint16_t) maxLen);
+
+int8_t Adafruit_BluefruitLE_GATT::addGattCharacteristic(uint16_t uuid16, CharacteristicProperties props, uint8_t minLen, uint8_t maxLen) {
+  char zeros[maxLen*3];
+  for(uint8_t i=0; i<maxLen; i++) {
+    zeros[i*3]   = '0';
+    zeros[i*3+1] = '0';
+    zeros[i*3+2] = '-';
+  }
+  zeros[maxLen*3-1] = '\0';  // replace the last '-' by '\0'
+  
+  char cmd[strlen_P(fmt_gattaddchar) + 2 + 1 + 1 + maxLen*3];
+  sprintf_P(cmd, fmt_gattaddchar, uuid16, props, minLen, maxLen, zeros);
   int32_t pos;
   assertOK(sendCommandWithIntReply(cmd, &pos), F("Could not add characteristic"));
-  return (int16_t) pos;
+  return (int8_t) pos;
 }
 
-void Adafruit_BluefruitLE_GATT::setGattCharacteristicValue(int16_t id, byte *value, uint16_t len) {
-  assertOK(id != 0, F("Characteristic id cannot be 0"));
-  assertOK(len != 0, F("Characteristic value length cannot be 0"));
+
+void Adafruit_BluefruitLE_GATT::setGattCharacteristicValue(int8_t id, byte *value, uint16_t len) {
+  if (len == 0) return;
   
   // AT+GATTCHAR takes each byte in hex separated by a dash, e.g. 4 bytes: xx-xx-xx-xx (= 11 characters)
   char str[len*3 + 1];  // +1 caters for terminating '\0' after each 'xx-' group
@@ -69,7 +79,31 @@ void Adafruit_BluefruitLE_GATT::setGattCharacteristicValue(int16_t id, byte *val
   assertOK(sendCommandCheckOK(cmd), F("Could not set characteristic value"));
 }
 
-uint16_t Adafruit_BluefruitLE_GATT::getGattCharacteristicValue(int16_t id, byte *reply, uint16_t maxLen) {
+
+void Adafruit_BluefruitLE_GATT::setGattCharacteristicValue(int8_t id, int16_t value) {
+  byte bytes[sizeof(int16_t)];
+  memcpy(bytes, &value, sizeof(int16_t));
+  reverseBytes(bytes, sizeof(int16_t));
+  setGattCharacteristicValue(id, bytes, sizeof(int16_t)); 
+}
+
+
+void Adafruit_BluefruitLE_GATT::setGattCharacteristicValue(int8_t id, int32_t value) {
+  byte bytes[sizeof(int32_t)];
+  memcpy(bytes, &value, sizeof(int32_t));
+  reverseBytes(bytes, sizeof(int32_t));
+  setGattCharacteristicValue(id, bytes, sizeof(int32_t)); 
+}
+
+
+void Adafruit_BluefruitLE_GATT::setGattCharacteristicValue(int8_t id, float value) {
+  byte bytes[sizeof(float)];
+  memcpy(bytes, &value, sizeof(float));
+  setGattCharacteristicValue(id, bytes, sizeof(float)); 
+}
+
+
+uint16_t Adafruit_BluefruitLE_GATT::getGattCharacteristicValue(int8_t id, byte *reply, uint16_t maxLen) {
   char cmd[strlen_P(fmt_gattgetchar) + 2 + 1];
   sprintf_P(cmd, fmt_gattgetchar, id);
   
@@ -88,6 +122,30 @@ uint16_t Adafruit_BluefruitLE_GATT::getGattCharacteristicValue(int16_t id, byte 
     reply[i] = (byte) strtol(&replyStr[i*3], NULL, 16);
   }
   return numBytes;
+}
+
+
+void Adafruit_BluefruitLE_GATT::getGattCharacteristicValue(int8_t id, int16_t *reply) {
+  byte bytes[sizeof(int16_t)];
+  getGattCharacteristicValue(id, bytes, sizeof(int16_t));
+  reverseBytes(bytes, sizeof(int16_t));
+  memcpy(reply, bytes, sizeof(int16_t));
+}
+
+
+void Adafruit_BluefruitLE_GATT::getGattCharacteristicValue(int8_t id, int32_t *reply) {
+  byte bytes[sizeof(int32_t)];
+  getGattCharacteristicValue(id, bytes, sizeof(int32_t));
+  reverseBytes(bytes, sizeof(int32_t));
+  memcpy(reply, bytes, sizeof(int32_t));
+}
+
+
+void Adafruit_BluefruitLE_GATT::getGattCharacteristicValue(int8_t id, float   *reply) {
+  byte bytes[sizeof(float)];
+  getGattCharacteristicValue(id, bytes, sizeof(float));
+  // don't reverse bytes!
+  memcpy(reply, bytes, sizeof(float));
 }
 
 
@@ -113,3 +171,10 @@ bool Adafruit_BluefruitLE_GATT::sendCommandWithStringReply(const char cmd[], cha
 }
 
 
+void reverseBytes(byte *buf, uint16_t len) {
+  for(uint16_t i=0; i<len/2; i++) {
+    byte b = buf[i];
+    buf[i] = buf[len-1-i];
+    buf[len-1-i] = b;
+  }
+}
