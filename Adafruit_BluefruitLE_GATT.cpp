@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include "Adafruit_BluefruitLE_GATT.h"
 
+#define RED_LED_PIN 13
+
 const char fmt_gapdevname[]     PROGMEM = "AT+GAPDEVNAME=%s";
 const char fmt_gattaddservice[] PROGMEM = "AT+GATTADDSERVICE=UUID128=%s";
 const char fmt_gattaddchar[]    PROGMEM = "AT+GATTADDCHAR=UUID=%#4X,PROPERTIES=%#2X,MIN_LEN=%i,MAX_LEN=%i,VALUE=0";
@@ -10,11 +12,22 @@ const char fmt_gattgetchar[]    PROGMEM = "AT+GATTCHAR=%i";
 const char fmt_bintohex[]       PROGMEM = "%02X-";
 
 void Adafruit_BluefruitLE_GATT::assertOK(boolean condition, const __FlashStringHelper*err) {
-  if (! condition) {
-    Serial.print("### ");
-    Serial.println(err);
-    Serial.flush();
-    while(1);
+  if (condition) return;
+  
+  Serial.print(F("### S.O.S. ### "));
+  Serial.println(err);
+  Serial.flush();
+  int pulse = 300; // [ms]
+  while(1) {
+    // S.O.S.
+    pulse = (pulse + 200) % 400; // toggles between 100 and 300 ms
+    delay(pulse);
+    for(byte i=0; i<3; i++) {
+      digitalWrite(RED_LED_PIN, HIGH);
+      delay(pulse);
+      digitalWrite(RED_LED_PIN, LOW);
+      delay(pulse); 
+    }      
   }
 }
 
@@ -45,13 +58,13 @@ void Adafruit_BluefruitLE_GATT::setGattCharacteristicValue(int16_t id, byte *val
   assertOK(len != 0, F("Characteristic value length cannot be 0"));
   
   // AT+GATTCHAR takes each byte in hex separated by a dash, e.g. 4 bytes: xx-xx-xx-xx (= 11 characters)
-  char str[len*3];  // includes terminating '\0'
+  char str[len*3 + 1];  // +1 caters for terminating '\0' after each 'xx-' group
   for (uint16_t i=0; i<len; i++) {
     sprintf_P(&str[i*3], fmt_bintohex, value[i]);
   }
-  str[len*3 - 1] = '\0';
+  str[len*3 - 1] = '\0'; // replace the last '-' by '\0'
   
-  char cmd[strlen_P(fmt_gattsetchar) + strlen(str) + 1];
+  char cmd[strlen_P(fmt_gattsetchar) + len*3];
   sprintf_P(cmd, fmt_gattsetchar, id, str);
   assertOK(sendCommandCheckOK(cmd), F("Could not set characteristic value"));
 }

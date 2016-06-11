@@ -62,7 +62,7 @@ void setup(void) {
   ble.setGattDeviceName("Boiler Controller");
   controllerServiceId =      ble.addGattService("4C-EF-DD-58-CB-95-44-50-90-FB-F4-04-DC-20-2F-7C");
   waterTempMeasureCharId =   ble.addGattCharacteristic(0x0001, CHAR_PROP_NOTIFY, 2, 2);
-  ambientTempMeasureCharId = ble.addGattCharacteristic(0x0002, CHAR_PROP_READ,   2, 4);
+  ambientTempMeasureCharId = ble.addGattCharacteristic(0x0002, CHAR_PROP_READ,   4, 4);
   targetTempCharId =         ble.addGattCharacteristic(0x0003, CHAR_PROP_READ | CHAR_PROP_WRITE, 2, 4);
   tankCapacityCharId =       ble.addGattCharacteristic(0x0004, CHAR_PROP_READ | CHAR_PROP_WRITE, 4, 4);
 
