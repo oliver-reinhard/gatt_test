@@ -19,7 +19,7 @@
   class Adafruit_BluefruitLE_GATT : public Adafruit_BluefruitLE_SPI {
 
     public:
-      void assertOK(boolean condition, const __FlashStringHelper*err);
+      void assertOK(boolean condition, const __FlashStringHelper *err);
       
       Adafruit_BluefruitLE_GATT(int8_t csPin, int8_t irqPin, int8_t rstPin = -1) : Adafruit_BluefruitLE_SPI(csPin, irqPin, rstPin) { };
 

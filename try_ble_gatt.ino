@@ -32,14 +32,14 @@ int8_t tankCapacityCharId;
 
 
 void setup(void) {
-    
-  while (!Serial); // required for Flora & Micro
-  delay(500);
-
   Serial.begin(115200);
-
+  while (!Serial) {
+    ; // wait for serial port to connect.
+  }
+  //Test::min_verbosity = TEST_VERBOSITY_ALL;
+  delay(500);
+  
   randomSeed(micros());
-
 
   ble.assertOK(ble.begin(BLE_VERBOSE_MODE), F("Couldn't find Bluefruit, make sure it's in CoMmanD mode & check wiring?"));
 
